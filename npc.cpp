@@ -1,4 +1,4 @@
-// Team 10 AI Module - Joseph Tindall
+// Team 10 AI Module
 #include <algorithm>
 #include <iostream>
 #include <string>

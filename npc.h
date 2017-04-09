@@ -20,7 +20,7 @@ Example Creation:
 	NonPlayerControlled bot("Kanna", vector<string>(10)={"d2","c2","s2","d7","d8","d9","h9","h10","h11","h12"}, true);
 
 Example Usage:
-	if (bot.Play(getTopDiscardPile() == true) cout << "Bot has declared victory!\n";
+	if (bot.Play(getTopDiscardPile()) == true) cout << "Bot has declared victory!\n";
 */
 
 #include <algorithm>

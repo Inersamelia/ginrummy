@@ -1,32 +1,5 @@
-// Team 10 AI
-#include <algorithm>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
+#include "npc.h"
 using namespace std;
-
-class NonPlayerControlled
-{
-public:
-	NonPlayerControlled();
-	NonPlayerControlled(const string n, const vector<string>& h, const bool d);
-
-	bool Play(const string discardCard);
-
-private:
-	bool debug;	// Show all important conclusions/actions the npc has decided to take.
-	string name;	// Will default to Larry if an empty string is given.
-	string debugPrefix = "\t !:: ";	// No non-dev should see this, edit accordingly to however it helps you identify.
-
-	vector<string> hand;	// Must be given a proper deck of 10 cards on creation of object.
-	map<string, vector<string>> sets;
-	vector<vector<string>> rows;
-
-	void DetermineMelds(); // This will set the above essential variables to best possible rows and sets combinations.
-	unsigned int CountSetCards();
-	unsigned int CountRowCards();
-};
 
 NonPlayerControlled::NonPlayerControlled()
 {
@@ -34,6 +7,7 @@ NonPlayerControlled::NonPlayerControlled()
 	system("pause");
 	exit(1);
 }
+
 NonPlayerControlled::NonPlayerControlled(const string n, const vector<string>& h, const bool d)
 {
 	debug = d;
@@ -66,7 +40,8 @@ NonPlayerControlled::NonPlayerControlled(const string n, const vector<string>& h
 
 void NonPlayerControlled::DetermineMelds()
 {
-	sort(hand.begin(), hand.end()); // Ensure the vector is in efficent looping order.
+	sort(hand.begin(), hand.end());
+	if (debug) cout << "\n";
 
 	// The function will first find temporary sets and rows, determine which of which to use for it's turn, then adjust class values with selection.
 	// Find all possible sets that could be matched into.
@@ -78,7 +53,8 @@ void NonPlayerControlled::DetermineMelds()
 			suitelessValueCount[string(*i).erase(0, 1)] += 1;
 
 	for (map<string, unsigned int>::iterator i = suitelessValueCount.begin(); i != suitelessValueCount.end(); i++)
-		if (i->second > 2)	// Since only sets of 3 and 4 are possible due to (Spade, Diamond, Heart, Clover), no fail safe is needed.
+		// Since only sets of 3 and 4 are possible due to (Spade, Diamond, Heart, Clover), no fail safe is needed.
+		if (i->second > 2)
 		{
 			if (debug) cout << debugPrefix << i->first << " can be a set of " << i->second << " cards.\n";
 
@@ -98,7 +74,8 @@ void NonPlayerControlled::DetermineMelds()
 						if (debug) cout << debugPrefix << *j << " added to set [" << i->first << "] in map<string, vector<string>> possibleSets.\n";
 					}
 			}
-		} else {
+		}
+		else {
 			if (possibleSets.find(i->first) != possibleSets.end())
 			{	// If the set is no longer possible, ensure it is not within the possible set list.
 				possibleSets.erase(i->first);
@@ -106,84 +83,142 @@ void NonPlayerControlled::DetermineMelds()
 			}
 		}
 
-	// Now that all possible sets are accounted for, attempt to find all possible rows.
-	map<string, vector<string>> seperatedSuites;
-	vector<vector<string>> possibleRows;
+		// Now that all possible sets are accounted for, attempt to find all possible rows.
+		unordered_map<string, vector<string>> seperatedSuites;
+		vector<vector<string>> possibleRows;
 
-	for (vector<string>::iterator i = hand.begin(); i != hand.end(); i++)
-	{	// Converts the string (char in a sense) to an int value for better sorting. Just easier for me to conceptualize.
-		if (seperatedSuites.find(to_string((*i)[0])) == seperatedSuites.end())
-			seperatedSuites.insert(pair<string, vector<string>>(to_string((*i)[0]), vector<string>()));
+		for (vector<string>::iterator i = hand.begin(); i != hand.end(); i++)
+		{
+			if (seperatedSuites.find(to_string((*i)[0])) == seperatedSuites.end())
+				seperatedSuites.insert(pair<string, vector<string>>(to_string((*i)[0]), vector<string>()));
 
-		seperatedSuites.find(to_string((*i)[0]))->second.push_back(string(*i).erase(0, 1));
-	}
+			seperatedSuites.find(to_string((*i)[0]))->second.push_back(string(*i).erase(0, 1));
+		}
 
-	for (map<string, vector<string>>::iterator i = seperatedSuites.begin(); i != seperatedSuites.end(); i++)
-	{
-		string rowCardBegun;
-		unsigned int rowStreakCount = 0;
-		vector<string> rowPushed;
-
-		for (vector<string>::iterator j = i->second.begin(); j != i->second.end(); j++)
-			if ((next(j) != i->second.end()) && (*next(j) == to_string(stoi(*j) + 1)))
-			{
-				if (rowStreakCount == 0)
-					rowCardBegun = *j;
-				rowStreakCount++;
-			} else {
-				if (rowStreakCount >= 2)
-				{
-					for (unsigned int k = 0; k <= rowStreakCount; k++)
-					{	// The following char() conversion is important, as the string is converted to int for ease of foor loop purposes. ASCII simply handles better.
-						rowPushed.push_back(char(stoi(i->first)) + *find(i->second.begin(), i->second.end(), to_string(stoi(rowCardBegun) + k)));
-						if (debug) cout << debugPrefix << to_string(stoi(rowCardBegun) + k) << " added to vector<string> rowPushed.\n";
+		// Sort the suites in int ascending value instead of character based.
+		for (unsigned int k = 0; k < seperatedSuites.size(); k++)
+			for (unordered_map<string, vector<string>>::iterator i = seperatedSuites.begin(); i != seperatedSuites.end(); i++)
+				for (vector<string>::iterator j = i->second.begin(); j != i->second.end(); j++)
+					if ((next(j) != i->second.end()) && (stoi(*j) > stoi(*next(j))))
+					{
+						string temp = *j;
+						*j = *next(j);
+						*next(j) = temp;
 					}
 
-					possibleRows.push_back(rowPushed);
-				}
-
-				rowStreakCount = 0;
-			}
-	}
-
-	// Determine which sets are invalid due to rows.
-	vector<string> invalidSets;
-	for (map<string, vector<string>>::iterator i = possibleSets.begin(); i != possibleSets.end(); i++)
-		for (vector<string>::iterator j = i->second.begin(); j != i->second.end(); j++)
-			for (vector<vector<string>>::iterator k = possibleRows.begin(); k != possibleRows.end(); k++)
-				for (vector<string>::iterator l = k->begin(); l != k->end(); l++)
-					if (*j == *l)
-						invalidSets.push_back(i->first);
-
-	for (vector<string>::iterator i = invalidSets.begin(); i != invalidSets.end(); i++)
-		possibleSets.erase(possibleSets.find(*i));
-
-	// Finaly, set essential class variables to temporary variables decided upon by this function.
-	for (map<string, vector<string>>::iterator i = possibleSets.begin(); i != possibleSets.end(); i++)
-		sets.insert(possibleSets.begin(), possibleSets.end());
-	rows = possibleRows;
-
-	// Debug output of final conclusions.
-	if (debug)
-	{
-		cout << debugPrefix << "essential sets:\n";
-		for (map<string, vector<string>>::iterator i = sets.begin(); i != sets.end(); i++)
+		for (unordered_map<string, vector<string>>::iterator i = seperatedSuites.begin(); i != seperatedSuites.end(); i++)
 		{
-			cout << "\t" << debugPrefix << i->first << ": ";
+			string rowCardBegun;
+			unsigned int rowStreakCount = 0;
+			vector<string> rowPushed;
+
+			if (debug) cout << debugPrefix << "Checking the " << i->first << " suite for rows.\n";
+
 			for (vector<string>::iterator j = i->second.begin(); j != i->second.end(); j++)
-				cout << *j << ", ";
-			cout << "\n";
+			{
+				if (debug) cout << "\t" << debugPrefix << "Checking " << *j << ", expecting " << to_string(stoi(*j) + 1) << "\n";
+
+				if ((next(j) != i->second.end()) && (*next(j) == to_string(stoi(*j) + 1)))
+				{
+					if (debug) cout << "\t\t" << debugPrefix << "Found " << *next(j) << ".\n";
+
+					if (rowStreakCount == 0)
+					{
+						rowCardBegun = *j;
+						if (debug) cout << "\t\t" << debugPrefix << "string rowCardBegun set to " << rowCardBegun << ".\n";
+					}
+
+					rowStreakCount++;
+				}
+				else {
+					if (rowStreakCount >= 2)
+					{
+						if (debug) cout << debugPrefix << "unsigned int rowStreakCount was at least 2, creating a new row.\n";
+						// The following char() conversion is important, as the string is converted to int for ease of foor loop purposes. ASCII simply handles better.
+						for (unsigned int k = 0; k <= rowStreakCount; k++)
+						{
+							rowPushed.push_back(char(stoi(i->first)) + *find(i->second.begin(), i->second.end(), to_string(stoi(rowCardBegun) + k)));
+							if (debug) cout << "\t" << debugPrefix << to_string(stoi(rowCardBegun) + k) << " added to vector<string> rowPushed.\n";
+						}
+
+						if (debug) cout << "\n";
+						possibleRows.push_back(rowPushed);
+					}
+
+					rowStreakCount = 0;
+				}
+			}
 		}
 
-		cout << debugPrefix << "essential rows:\n";
-		for (vector<vector<string>>::iterator i = rows.begin(); i != rows.end(); i++)
+		// Determine which sets are invalid due to rows.
+		vector<string> invalidSets;
+		for (map<string, vector<string>>::iterator i = possibleSets.begin(); i != possibleSets.end(); i++)
+			for (vector<string>::iterator j = i->second.begin(); j != i->second.end(); j++)
+				for (vector<vector<string>>::iterator k = possibleRows.begin(); k != possibleRows.end(); k++)
+					for (vector<string>::iterator l = k->begin(); l != k->end(); l++)
+						if (*j == *l)
+							invalidSets.push_back(i->first);
+
+		for (vector<string>::iterator i = invalidSets.begin(); i != invalidSets.end(); i++)
+			possibleSets.erase(possibleSets.find(*i));
+
+		// Finaly, set essential class variables to temporary variables decided upon by this function.
+		for (map<string, vector<string>>::iterator i = possibleSets.begin(); i != possibleSets.end(); i++)
+			sets.insert(possibleSets.begin(), possibleSets.end());
+		rows = possibleRows;
+
+		if (debug)
 		{
-			cout << "\t" << debugPrefix;
-			for (vector<string>::iterator j = i->begin(); j != i->end(); j++)
-				cout << *j << ", ";
+			cout << debugPrefix << "essential sets:\n";
+			for (map<string, vector<string>>::iterator i = sets.begin(); i != sets.end(); i++)
+			{
+				cout << "\t" << debugPrefix << i->first << ": ";
+				for (vector<string>::iterator j = i->second.begin(); j != i->second.end(); j++)
+					cout << *j << ", ";
+				cout << "\n";
+			}
+
+			cout << debugPrefix << "essential rows:\n";
+			for (vector<vector<string>>::iterator i = rows.begin(); i != rows.end(); i++)
+			{
+				cout << "\t" << debugPrefix;
+				for (vector<string>::iterator j = i->begin(); j != i->end(); j++)
+					cout << *j << ", ";
+				cout << "\n";
+			}
+
 			cout << "\n";
 		}
+}
+
+void NonPlayerControlled::DetermineDeadwood()
+{
+	deadwood.erase(deadwood.begin(), deadwood.end());
+	if (debug) cout << debugPrefix << "deadwood cards are: ";
+
+	for (vector<string>::iterator i = hand.begin(); i != hand.end(); i++)
+	{
+		bool inMeld = false;
+
+		for (map<string, vector<string>>::iterator j = sets.begin(); j != sets.end(); j++)
+			for (vector<string>::iterator k = j->second.begin(); k != j->second.end(); k++)
+				if (*k == *i)
+					inMeld = true;
+
+		for (vector<vector<string>>::iterator j = rows.begin(); j != rows.end(); j++)
+			for (vector<string>::iterator k = j->begin(); k != j->end(); k++)
+				if (*k == *i)
+					inMeld = true;
+
+		if (inMeld == false)
+		{
+			deadwood.push_back(*i);
+			if (debug) cout << *i << ", ";
+		}
 	}
+
+	sort(deadwood.begin(), deadwood.end());
+	if (debug) cout << "\n";
 }
 
 unsigned int NonPlayerControlled::CountSetCards()
@@ -214,11 +249,10 @@ unsigned int NonPlayerControlled::CountRowCards()
 
 bool NonPlayerControlled::Play(const string discardCard)
 {
-	// First determine what is currently in hand with no predictions.
 	DetermineMelds();
-
 	unsigned int currentSetsCount = CountSetCards();
 	unsigned int currentRowsCount = CountRowCards();
+	string cardToAdd = "";
 
 	// Determine if the discard card will be used to make an immediate increase in meld.
 	hand.push_back(discardCard);
@@ -226,31 +260,74 @@ bool NonPlayerControlled::Play(const string discardCard)
 
 	DetermineMelds();
 
+	hand.erase(remove(hand.begin(), hand.end(), discardCard), hand.end());
+	if (debug) cout << debugPrefix << discardCard << " was removed from vector<string> hand.\n";
+
 	if (currentSetsCount == CountSetCards() && currentRowsCount == CountRowCards()) {
 		if (debug) cout << debugPrefix << "There was no change in melds found, discard card deemed to risky.\n";
-			
-		hand.erase(remove(hand.begin(), hand.end(), discardCard), hand.end());
-		// TODO: Add function to pull card from unknown deck.
-		DetermineMelds();
-	} else {
+
+		// TODO: Get card to add from deck.
+		cardToAdd = "Unknown Stack Card";
+	}
+	else {
 		if (debug) cout << debugPrefix << "There was a change in melds found, discard card deemed worthy.\n";
-		// TODO: Add function to pull the discard card.
+
+		// TODO: Get card from discard deck.
+		cardToAdd = "Discard Stack Card";
 	}
 
-	// Now, discard one card that is not the pulled card.
+	DetermineMelds();
+	DetermineDeadwood();
 
-	// Check if bot has melded all cards.
-	if (CountSetCards() + CountRowCards() == 10)
-		return true;
-	return false;
-}
+	string cardToDiscard = "";
+	string highestSuiteFound = "";
+	int highestSuitelessValue = 0;
 
-int main()
-{
-	NonPlayerControlled bot("Kanna", vector<string>(10)={"s6","c6","h11","h9","d8","d9","d7","d1","h10","h12"}, true);
+	for (vector<string>::iterator i = deadwood.begin(); i != deadwood.end(); i++)
+		if (highestSuitelessValue < stoi(string(*i).erase(0, 1)) && (*i != cardToAdd))
+		{
+			highestSuitelessValue = stoi(string(*i).erase(0, 1));
+			highestSuiteFound = string(*i).erase(1, (*i).size() - 1);
 
-	bot.Play("h13");
+			if (debug) cout << debugPrefix << "string highestSuiteFound set to " << string(*i).erase(1, (*i).size() - 2) << ".\n";
+			if (debug) cout << debugPrefix << "unsigned int highestSuitelessValue set to " << stoi(string(*i).erase(0, 1)) << ".\n";
+		}
 
-	cout << "\n"; system("pause");
-	return 0;
+	// Determine what card to discard. If deadwood is found, use the highest card unless a 2 is found, then use an ace if possible. 
+	// Otherwise use the largest card within sets. If no set is found, use largest row.
+	if (highestSuiteFound != "")
+		if (highestSuitelessValue > 1)
+			cardToDiscard = highestSuiteFound + to_string(highestSuitelessValue);
+		else
+			cardToDiscard = deadwood.front();
+	else
+		if (CountSetCards() > 0)
+		{
+			unsigned int largestSetFound = 0;
+
+			for (map<string, vector<string>>::iterator i = sets.begin(); i != sets.end(); i++)
+				if (i->second.size() > largestSetFound)
+				{
+					largestSetFound = i->second.size();
+					cardToDiscard = i->second.back();
+				}
+		}
+		else {
+			unsigned int largestRowFound = 0;
+
+			for (vector<vector<string>>::iterator i = rows.begin(); i != rows.end(); i++)
+				if (i->size() > largestRowFound)
+				{
+					largestRowFound = i->size();
+					cardToDiscard = i->back();
+				}
+		}
+
+		// TODO: Add function to add card to discard pile.
+		hand.erase(remove(hand.begin(), hand.end(), cardToDiscard), hand.end());
+		if (debug) cout << debugPrefix << cardToDiscard << " was discarded.\n";
+
+		if (CountSetCards() + CountRowCards() == 10)
+			return true;
+		return false;
 }
